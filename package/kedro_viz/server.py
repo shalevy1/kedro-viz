@@ -56,6 +56,8 @@ from toposort import toposort_flatten
 
 from kedro_viz.utils import wait_for
 import pai
+from kedro.config import MissingConfigException
+from pai.exceptions import PaiRunException
 
 KEDRO_VERSION = VersionInfo.parse(kedro.__version__)
 
@@ -297,7 +299,7 @@ def _pretty_name(name: str) -> str:
     return " ".join(parts)
 
 
-def format_pipelines_data(pipelines: Dict[str, "Pipeline"]) -> Dict[str, list]:
+def format_pipelines_data(pipelines: Dict[str, "Pipeline"], context) -> Dict[str, list]:
     """
     Format pipelines and catalog data from Kedro for kedro-viz.
 
@@ -329,6 +331,7 @@ def format_pipelines_data(pipelines: Dict[str, "Pipeline"]) -> Dict[str, list]:
             tags,
             edges_list,
             nodes_list,
+            context
         )
 
     # sort tags
@@ -367,6 +370,7 @@ def format_pipeline_data(
     tags: Set[str],
     edges_list: List[dict],
     nodes_list: List[dict],
+    context
 ) -> None:
     """Format pipeline and catalog data from Kedro for kedro-viz.
 
@@ -401,7 +405,7 @@ def format_pipeline_data(
                         "full_name": getattr(node, "_func_name", str(node)),
                         "tags": sorted(node.tags),
                         "pipelines": [pipeline_key],
-                        "pai_runs": get_pai_data(node),
+                        "pai_runs": get_pai_data(node, context),
                     }
                 else:
                     nodes[task_id] = {
@@ -487,11 +491,31 @@ def is_pai_node(node):
     return False
 
 
-def get_pai_data(node):
+def get_pai_data(node, context):
     experiment_name = next(
         tag.lstrip("pai:") for tag in [tag for tag in node.tags if tag.startswith("pai:")]
     )
     node_name = getattr(node, "_func_name", str(node))
+
+    default_storage_location = Path.cwd() / "logs" / "pai"
+
+    try:
+        pai_config = context.config_loader.get("pai*", "pai*/**", "**/pai*")
+    except MissingConfigException:
+        logger = logging.getLogger(__name__)
+        logger.info(
+            "'pai.yml' not found. Using the default storage: %s",
+            default_storage_location,
+        )
+        storage_location = default_storage_location
+    except Exception as exc:
+        raise PaiRunException(f"Invalid PAI configuration file: {exc}") from exc
+    else:
+        storage_location = Path(
+            pai_config.get("PAI_RUNS", default_storage_location)
+        )
+    logging.getLogger(__name__).info("Storage is %s", storage_location)
+    pai.set_config(storage_runs=storage_location)
     runs = pai.load_runs(experiment=experiment_name, tags=[node_name])
     return list(runs["run_id"])
 
@@ -739,7 +763,7 @@ def _call_viz(
             raise KedroCliError(ERROR_PROJECT_ROOT)  # pragma: no cover
 
         _CATALOG = context.catalog
-        _DATA = format_pipelines_data(pipelines)
+        _DATA = format_pipelines_data(pipelines, context)
 
     if save_file:
         Path(save_file).write_text(json.dumps(_DATA, indent=4, sort_keys=True))
