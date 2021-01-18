@@ -60,6 +60,7 @@ const combinedReducer = combineReducers({
   visible,
   // These props don't have any actions associated with them
   asyncDataSource: createReducer(false),
+  randomData: createReducer(false),
   edge: createReducer({}),
   id: createReducer(null),
   // These props have very simple non-nested actions

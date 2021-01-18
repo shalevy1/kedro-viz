@@ -189,6 +189,30 @@ class Pipeline {
   }
 
   /**
+   * Generate node metadata panel info
+   * @param {object} node A single node object
+   */
+  getNodeMetaData(node) {
+    const { getRandom, getRandomName, randomNumber } = this.utils;
+
+    if (node.type === 'task') {
+      node.code = Pipeline.prototype[
+        getRandom(Object.getOwnPropertyNames(Pipeline.prototype))
+      ].toString();
+      node.docstring = getRandomName(randomNumber(10), '/');
+    } else if (node.type === 'data') {
+      node.datasetType = getRandomName(randomNumber(2));
+    }
+    node.filepath = getRandomName(randomNumber(10, '/'));
+    node.parameters = arrayToObject(
+      getNumberArray(this.utils.randomNumber(10)).map(() =>
+        getRandomName(randomNumber(2), '_')
+      ),
+      () => this.utils.randomNumber(50) / 10
+    );
+  }
+
+  /**
    * Create a list of the pipelines that the node will be included in
    * @returns {array} Node piplines
    */
@@ -359,6 +383,7 @@ class Pipeline {
         node.full_name = `${node.layer}_${node.type}_${node.rank}_${
           node.name
         }`.replace(/\s/g, '_');
+        this.getNodeMetaData(node);
       }
     }
   }
@@ -388,6 +413,7 @@ class Pipeline {
    */
   all() {
     return {
+      randomData: true,
       edges: this.edges,
       layers: LAYERS,
       nodes: this.nodes,

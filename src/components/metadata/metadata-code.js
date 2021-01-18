@@ -6,6 +6,7 @@ import yaml from 'highlight.js/lib/languages/yaml';
 import modifiers from '../../utils/modifiers';
 import './styles/metadata-code.css';
 
+let javascript;
 hljs.registerLanguage('python', python);
 hljs.registerLanguage('yaml', yaml);
 
@@ -13,11 +14,17 @@ hljs.registerLanguage('yaml', yaml);
  * A highlighted code panel
  */
 export const MetaDataCode = ({
+  randomData,
+  sidebarVisible,
   visible = true,
-  value = '',
-  sidebarVisible
+  value = ''
 }) => {
   const codeRef = useRef();
+
+  if (randomData && !javascript) {
+    javascript = require('highlight.js/lib/languages/javascript');
+    hljs.registerLanguage('javascript', javascript);
+  }
 
   const highlighted = useMemo(() => {
     const detected = hljs.highlightAuto(value);
@@ -41,7 +48,8 @@ export const MetaDataCode = ({
 };
 
 const mapStateToProps = state => ({
-  sidebarVisible: state.visible.sidebar
+  sidebarVisible: state.visible.sidebar,
+  randomData: state.randomData
 });
 
 export default connect(mapStateToProps)(MetaDataCode);
