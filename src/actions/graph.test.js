@@ -1,6 +1,8 @@
 import { createStore } from 'redux';
 import reducer from '../reducers';
-import { mockState } from '../utils/state.mock';
+import { largeGraphThreshold } from '../config';
+import { mockState, prepareState } from '../utils/state.mock';
+import animals from '../utils/data/animals.mock.json';
 import { changeFlag } from './index';
 import { calculateGraph, updateGraph } from './graph';
 import { getGraphInput } from '../selectors/layout';
@@ -63,8 +65,21 @@ describe('graph actions', () => {
     });
 
     it('triggers large warning', () => {
-      const store = createStore(reducer, mockState.animals);
-      return calculateGraph(getGraphInput(mockState.animals), 10)(
+      // Modify the animals dataset to add so many nodes that it triggers the warning:
+      const data = { ...animals };
+      let extraNodes = [];
+      const iterations = Math.ceil(largeGraphThreshold / data.nodes.length) + 1;
+      new Array(iterations).fill().forEach((d, i) => {
+        const extraNodeGroup = data.nodes.map(node => ({
+          ...node,
+          id: node.id + i
+        }));
+        extraNodes = extraNodes.concat(extraNodeGroup);
+      });
+      data.nodes = data.nodes.concat(extraNodes);
+      const customMockState = prepareState({ data });
+      const store = createStore(reducer, customMockState);
+      return calculateGraph(getGraphInput(customMockState))(
         store.dispatch
       ).then(() => {
         const state = store.getState();
